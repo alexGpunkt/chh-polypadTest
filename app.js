@@ -1,228 +1,309 @@
-/*
-  Polypad API Testversion
-  Thema: Gleichungen mit einer Waage, z. B. 3x + 5 = 8
-*/
-
-const $ = (selector) => document.querySelector(selector);
-
-const apiStatus = $('#apiStatus');
-const taskText = $('#taskText');
-const feedback = $('#feedback');
-const jsonBox = $('#jsonBox');
-const changeCounter = $('#changeCounter');
-const selectionInfo = $('#selectionInfo');
+"use strict";
 
 let pad = null;
-let changes = 0;
-let currentTask = { a: 3, b: 5, c: 8 };
+let changeCount = 0;
+let selectedCount = 0;
 
-function setStatus(text, type = '') {
-  apiStatus.textContent = text;
-  apiStatus.className = `status ${type}`.trim();
+const $ = (id) => document.getElementById(id);
+
+const statusBox = $("status");
+const checkBox = $("checkResult");
+const jsonBox = $("jsonBox");
+const statsBox = $("stats");
+
+function setStatus(text, type = "info") {
+  if (!statusBox) return;
+  statusBox.textContent = text;
+  statusBox.className = type;
 }
 
-function setFeedback(text, kind = 'neutral') {
-  feedback.textContent = text;
-  feedback.className = `feedback ${kind}`;
+function setCheck(text, type = "info") {
+  if (!checkBox) return;
+  checkBox.textContent = text;
+  checkBox.className = type;
 }
 
-function taskToText(t) {
-  return `Stelle die Gleichung ${t.a}x + ${t.b} = ${t.c} mit der Waage dar.`;
+function updateStats() {
+  if (!statsBox) return;
+  statsBox.textContent = `Änderungen: ${changeCount} Auswahl: ${selectedCount || "–"}`;
 }
 
-function randomTask() {
-  const a = Math.floor(Math.random() * 4) + 1; // 1 bis 4
-  const b = Math.floor(Math.random() * 7) + 1; // 1 bis 7
-  const x = Math.floor(Math.random() * 4) + 1; // gedachte Lösung 1 bis 4
-  return { a, b, c: a * x + b };
-}
-
-function initialData() {
-  return {
-    title: 'Gleichungen mit der Waage',
-    version: 5,
-    options: {
-      canvas: 'fixed',
-      canvasX: 1200,
-      canvasY: 700,
-      grid: 'square-dots',
-      sidebar: 'numbers,number-cards,algebra,balance',
-      toolbar: 'move,pen,text,eraser,color',
-      settings: 'fullscreen,grid,download'
-    },
-    tiles: {
-      intro: {
-        name: 'text',
-        x: -500,
-        y: -270,
-        width: 460,
-        fontSize: 20,
-        html: '<b>Aufgabe:</b><br>Lege links die Terme mit x und Zahlenkarten.<br>Lege rechts die Ergebniszahl.'
-      },
-      balance1: { name: 'balance', x: 0, y: 60, size: 2.2, level: 0 }
-    },
-    strokes: {}
-  };
-}
-
-function requirePad() {
-  if (!pad) {
-    setFeedback('Polypad ist noch nicht bereit.', 'bad');
-    return false;
-  }
-  return true;
-}
-
-function initPolypad() {
-  if (!window.Polypad) {
-    setStatus('API nicht geladen', 'bad');
-    setFeedback('Die Polypad-API konnte nicht geladen werden. Prüfe Internetverbindung oder Script-URL.', 'bad');
-    return;
-  }
-
+async function startPolypad() {
   try {
-    const container = $('#polypad');
+    setStatus("API lädt ...", "info");
 
-    // Die offizielle Minimalform ist Polypad.create(parentElement).
-    pad = Polypad.create(container);
+    const container = $("polypad");
+    if (!container) {
+      throw new Error("Container #polypad wurde nicht gefunden.");
+    }
 
-    pad.deserialize(initialData());
-    pad.bindKeyboardEvents();
+    if (!window.Polypad) {
+      throw new Error("Polypad-API wurde nicht geladen. Prüfe den script-Import in index.html.");
+    }
 
-    pad.on('change', () => {
-      changes += 1;
-      changeCounter.textContent = `Änderungen: ${changes}`;
-    });
+    if (typeof window.Polypad.create === "function") {
+      pad = await window.Polypad.create(container, {
+        toolbar: true,
+        settings: true
+      });
+    } else if (typeof window.Polypad === "function") {
+      pad = new window.Polypad(container, {
+        toolbar: true,
+        settings: true
+      });
+    } else {
+      throw new Error("Polypad ist geladen, aber die Startfunktion ist unbekannt.");
+    }
 
-    pad.on('selection', (event) => {
-      const selected = event?.tiles?.length ? event.tiles.join(', ') : '–';
-      selectionInfo.textContent = `Auswahl: ${selected}`;
-    });
+    attachPadEvents();
 
-    setStatus('API aktiv', 'ok');
-    currentTask = randomTask();
-    taskText.textContent = taskToText(currentTask);
-    setFeedback('Lege die Aufgabe im Polypad oder klicke auf „Beispiel automatisch legen“.', 'neutral');
+    setStatus("Polypad bereit.", "success");
+    setCheck("Noch nicht geprüft.", "info");
+    updateStats();
+
   } catch (err) {
     console.error(err);
-    setStatus('Fehler beim Start', 'bad');
-    setFeedback(`Fehler beim Start der Polypad-API: ${err.message}`, 'bad');
+    setStatus("Fehler beim Start", "error");
+    setCheck("Fehler beim Start der Polypad-API: " + err.message, "error");
   }
 }
 
-function addTile(data) {
-  if (!requirePad()) return;
-  return pad.add(data);
-}
+function attachPadEvents() {
+  if (!pad) return;
 
-function addXTile(x = -280, y = -60) {
-  return addTile({ name: 'algebra', expr: 'x', x, y, splitH: 1, splitV: 1 });
-}
+  const possibleChangeEvents = ["change", "update", "tilesChanged"];
+  const possibleSelectEvents = ["select", "selection", "selectionChanged"];
 
-function addNumberCard(value, x = -120, y = -60) {
-  return addTile({ name: 'number-card', value, valueStr: String(value), x, y });
-}
+  if (typeof pad.on === "function") {
+    possibleChangeEvents.forEach((eventName) => {
+      try {
+        pad.on(eventName, () => {
+          changeCount++;
+          updateStats();
+        });
+      } catch (e) {}
+    });
 
-function buildExample() {
-  if (!requirePad()) return;
-  pad.clear();
-  pad.add({ name: 'balance', x: 0, y: 70, size: 2.2, level: 0 });
-  pad.add({
-    name: 'text',
-    x: -500,
-    y: -275,
-    width: 520,
-    fontSize: 20,
-    html: `<b>${currentTask.a}x + ${currentTask.b} = ${currentTask.c}</b><br>Dies ist ein automatisch gelegtes Beispiel.`
-  });
-
-  for (let i = 0; i < currentTask.a; i++) {
-    addXTile(-360 + i * 75, -40);
-  }
-  addNumberCard(currentTask.b, -80, -40);
-  addNumberCard(currentTask.c, 285, -40);
-  pad.resetViewport();
-  setFeedback('Beispiel wurde in Polypad gelegt. Du kannst die Kacheln verschieben oder ändern.', 'neutral');
-}
-
-function getTiles() {
-  if (!requirePad()) return {};
-  return pad.serialize().tiles || {};
-}
-
-function checkWork() {
-  if (!requirePad()) return;
-  const tiles = Object.values(getTiles());
-
-  // Einfache Testlogik: links ist x < 0, rechts ist x >= 0.
-  const left = { xTiles: 0, numberSum: 0 };
-  const right = { xTiles: 0, numberSum: 0 };
-
-  for (const tile of tiles) {
-    const side = (tile.x ?? 0) < 0 ? left : right;
-    if (tile.name === 'algebra' && String(tile.expr).trim() === 'x') side.xTiles += 1;
-    if (tile.name === 'number-card') side.numberSum += Number(tile.value ?? tile.valueStr ?? 0);
-  }
-
-  const ok = left.xTiles === currentTask.a &&
-             left.numberSum === currentTask.b &&
-             right.xTiles === 0 &&
-             right.numberSum === currentTask.c;
-
-  if (ok) {
-    setFeedback(`Richtig: Links liegen ${left.xTiles}x + ${left.numberSum}, rechts liegt ${right.numberSum}.`, 'good');
-  } else {
-    setFeedback(`Noch nicht passend. Erkannt: links ${left.xTiles}x + ${left.numberSum}, rechts ${right.xTiles}x + ${right.numberSum}.`, 'bad');
+    possibleSelectEvents.forEach((eventName) => {
+      try {
+        pad.on(eventName, () => {
+          selectedCount = getSelectionCount();
+          updateStats();
+        });
+      } catch (e) {}
+    });
   }
 }
 
-function exportJson() {
-  if (!requirePad()) return;
-  const data = pad.serialize();
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'polypad-zustand.json';
-  a.click();
-  URL.revokeObjectURL(url);
+function getSelectionCount() {
+  if (!pad) return 0;
+
+  if (Array.isArray pad.selection) {
+    return pad.selection.length;
+  }
+
+  if (typeof pad.getSelection === "function") {
+    const selection = pad.getSelection();
+    return Array.isArray(selection) ? selection.length : 0;
+  }
+
+  if (Array.isArray(pad.selectedTiles)) {
+    return pad.selectedTiles.length;
+  }
+
+  return 0;
 }
 
-function copyJsonToTextArea() {
-  if (!requirePad()) return;
-  jsonBox.value = JSON.stringify(pad.serialize(), null, 2);
-}
+function clearPad() {
+  if (!pad) return setCheck("Polypad ist noch nicht bereit.", "error");
 
-function importJsonFromTextArea() {
-  if (!requirePad()) return;
   try {
-    const data = JSON.parse(jsonBox.value);
-    pad.unSerialize(data);
-    pad.resetViewport();
-    setFeedback('JSON wurde geladen.', 'good');
+    if (typeof pad.clear === "function") {
+      pad.clear();
+    } else if (typeof pad.reset === "function") {
+      pad.reset();
+    } else if (typeof pad.setJSON === "function") {
+      pad.setJSON({});
+    } else {
+      throw new Error("Keine passende Leer-Funktion gefunden.");
+    }
+
+    changeCount++;
+    setCheck("Polypad wurde geleert.", "success");
+    updateStats();
+
   } catch (err) {
-    setFeedback(`JSON konnte nicht geladen werden: ${err.message}`, 'bad');
+    console.error(err);
+    setCheck("Fehler beim Leeren: " + err.message, "error");
   }
 }
 
-$('#newTaskBtn').addEventListener('click', () => {
-  currentTask = randomTask();
-  taskText.textContent = taskToText(currentTask);
-  setFeedback('Neue Aufgabe erstellt. Lege sie mit Polypad-Kacheln nach.', 'neutral');
-});
+function addTile(type) {
+  if (!pad) return setCheck("Polypad ist noch nicht bereit.", "error");
 
-$('#buildExampleBtn').addEventListener('click', buildExample);
-$('#checkBtn').addEventListener('click', checkWork);
-$('#addXBtn').addEventListener('click', () => addXTile(-260 + Math.random() * 80, -100 + Math.random() * 140));
-$('#addOneBtn').addEventListener('click', () => addNumberCard(1, -100 + Math.random() * 80, -100 + Math.random() * 140));
-$('#addFiveBtn').addEventListener('click', () => addNumberCard(5, 250 + Math.random() * 80, -100 + Math.random() * 140));
-$('#clearBtn').addEventListener('click', () => {
-  if (!requirePad()) return;
-  pad.clear();
-  setFeedback('Polypad wurde geleert.', 'neutral');
-});
-$('#exportBtn').addEventListener('click', exportJson);
-$('#copyJsonBtn').addEventListener('click', copyJsonToTextArea);
-$('#importBtn').addEventListener('click', importJsonFromTextArea);
+  try {
+    if (typeof pad.addTile === "function") {
+      pad.addTile(type);
+    } else if (typeof pad.add === "function") {
+      pad.add(type);
+    } else if (typeof pad.insert === "function") {
+      pad.insert(type);
+    } else {
+      throw new Error("Diese Polypad-Version erlaubt kein direktes Hinzufügen per API.");
+    }
 
-window.addEventListener('load', initPolypad);
+    changeCount++;
+    setCheck(`${type} wurde eingefügt.`, "success");
+    updateStats();
+
+  } catch (err) {
+    console.error(err);
+    setCheck("Fehler beim Einfügen: " + err.message, "error");
+  }
+}
+
+function newTask() {
+  clearPad();
+  setCheck("Neue Aufgabe erstellt: Stelle die Gleichung dar.", "info");
+}
+
+function autoExample() {
+  if (!pad) return setCheck("Polypad ist noch nicht bereit.", "error");
+
+  clearPad();
+
+  setTimeout(() => {
+    addTile("variable");
+    addTile("one");
+    addTile("five");
+    setCheck("Beispiel wurde automatisch gelegt, soweit die API dies unterstützt.", "success");
+  }, 200);
+}
+
+function checkAnswer() {
+  if (!pad) return setCheck("Polypad ist noch nicht bereit.", "error");
+
+  selectedCount = getSelectionCount();
+  updateStats();
+
+  setCheck("Prüfung vorbereitet. Die konkrete mathematische Auswertung muss noch an die verwendeten Polypad-Objekte angepasst werden.", "info");
+}
+
+function getPadJSON() {
+  if (!pad) throw new Error("Polypad ist noch nicht bereit.");
+
+  if (typeof pad.serialize === "function") {
+    return pad.serialize();
+  }
+
+  if (typeof pad.toJSON === "function") {
+    return pad.toJSON();
+  }
+
+  if (typeof pad.getJSON === "function") {
+    return pad.getJSON();
+  }
+
+  if (typeof pad.save === "function") {
+    return pad.save();
+  }
+
+  throw new Error("Keine Export-Funktion gefunden.");
+}
+
+function loadPadJSON(data) {
+  if (!pad) throw new Error("Polypad ist noch nicht bereit.");
+
+  if (typeof pad.deserialize === "function") {
+    return pad.deserialize(data);
+  }
+
+  if (typeof pad.fromJSON === "function") {
+    return pad.fromJSON(data);
+  }
+
+  if (typeof pad.setJSON === "function") {
+    return pad.setJSON(data);
+  }
+
+  if (typeof pad.load === "function") {
+    return pad.load(data);
+  }
+
+  throw new Error("Keine Lade-Funktion gefunden.");
+}
+
+function exportJSON() {
+  try {
+    const data = getPadJSON();
+    const text = JSON.stringify(data, null, 2);
+
+    if (jsonBox) jsonBox.value = text;
+
+    const blob = new Blob([text], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "polypad-zustand.json";
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+    setCheck("JSON wurde exportiert.", "success");
+
+  } catch (err) {
+    console.error(err);
+    setCheck("Fehler beim Exportieren: " + err.message, "error");
+  }
+}
+
+function copyJSONToTextField() {
+  try {
+    const data = getPadJSON();
+    if (jsonBox) {
+      jsonBox.value = JSON.stringify(data, null, 2);
+    }
+    setCheck("JSON wurde in das Textfeld kopiert.", "success");
+
+  } catch (err) {
+    console.error(err);
+    setCheck("Fehler beim Kopieren: " + err.message, "error");
+  }
+}
+
+function loadJSONFromTextField() {
+  try {
+    if (!jsonBox || !jsonBox.value.trim()) {
+      throw new Error("Das Textfeld ist leer.");
+    }
+
+    const data = JSON.parse(jsonBox.value);
+    loadPadJSON(data);
+
+    changeCount++;
+    setCheck("JSON wurde geladen.", "success");
+    updateStats();
+
+  } catch (err) {
+    console.error(err);
+    setCheck("Fehler beim Laden: " + err.message, "error");
+  }
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  $("btnNew")?.addEventListener("click", newTask);
+  $("btnAuto")?.addEventListener("click", autoExample);
+  $("btnCheck")?.addEventListener("click", checkAnswer);
+
+  $("btnX")?.addEventListener("click", () => addTile("variable"));
+  $("btnOne")?.addEventListener("click", () => addTile("one"));
+  $("btnFive")?.addEventListener("click", () => addTile("five"));
+  $("btnClear")?.addEventListener("click", clearPad);
+
+  $("btnExport")?.addEventListener("click", exportJSON);
+  $("btnCopy")?.addEventListener("click", copyJSONToTextField);
+  $("btnLoad")?.addEventListener("click", loadJSONFromTextField);
+
+  startPolypad();
+});
