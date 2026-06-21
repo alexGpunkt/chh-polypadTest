@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Polypad API Test – Gleichungen mit Waage</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Polypad API Test</h1>
+      <p>Erste Testversion: Polypad wird per JavaScript API eingebunden und von eigener App-Logik gesteuert.</p>
+    </div>
+    <div class="status" id="apiStatus">API lädt …</div>
+  </header>
+
+  <main class="layout">
+    <section class="panel">
+      <h2>Aufgabe</h2>
+      <p class="task" id="taskText">Stelle die Gleichung dar.</p>
+
+      <div class="button-row">
+        <button id="newTaskBtn">Neue Aufgabe</button>
+        <button id="buildExampleBtn">Beispiel automatisch legen</button>
+        <button id="checkBtn">Prüfen</button>
+      </div>
+
+      <div id="feedback" class="feedback neutral">Noch nicht geprüft.</div>
+
+      <h2>API-Steuerung</h2>
+      <div class="button-row">
+        <button id="addXBtn">x-Kachel</button>
+        <button id="addOneBtn">1er-Karte</button>
+        <button id="addFiveBtn">5er-Karte</button>
+        <button id="clearBtn" class="danger">Leeren</button>
+      </div>
+
+      <h2>Speichern / Laden</h2>
+      <div class="button-row">
+        <button id="exportBtn">JSON exportieren</button>
+        <button id="copyJsonBtn">JSON in Textfeld kopieren</button>
+        <button id="importBtn">JSON laden</button>
+      </div>
+      <textarea id="jsonBox" spellcheck="false" placeholder="Hier erscheint der Polypad-Zustand als JSON oder kann eingefügt werden."></textarea>
+
+      <details>
+        <summary>Hinweis zur Testversion</summary>
+        <p>
+          Die automatische Prüfung ist absichtlich einfach gehalten: Sie zählt x-Kacheln und Zahlenkarten links/rechts der Waage.
+          Für eine echte Lernapp müsste man Aufgaben, Prüfregeln und erlaubte Werkzeuge genauer festlegen.
+        </p>
+      </details>
+    </section>
+
+    <section class="workspace">
+      <div id="polypad"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span id="changeCounter">Änderungen: 0</span>
+    <span id="selectionInfo">Auswahl: –</span>
+  </footer>
+
+  <!-- Wichtig: Laut Dokumentation soll das Polypad-Skript im body eingebunden werden. -->
+  <script src="https://static.mathigon.org/api/polypad-en-v5.0.5.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
