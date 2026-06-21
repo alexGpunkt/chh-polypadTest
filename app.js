@@ -86,7 +86,7 @@ function initPolypad() {
     // Die offizielle Minimalform ist Polypad.create(parentElement).
     pad = Polypad.create(container);
 
-    pad.unSerialize(initialData());
+    pad.deserialize(initialData());
     pad.bindKeyboardEvents();
 
     pad.on('change', () => {
