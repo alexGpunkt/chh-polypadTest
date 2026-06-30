@@ -3,97 +3,162 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Polypad API Test – Gleichungen mit Waage</title>
+  <title>Polypad API – Vollversion Test</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="topbar">
     <div>
-      <h1>Polypad API Test</h1>
-      <p>Erste Testversion: Polypad wird per JavaScript API eingebunden und von eigener App-Logik gesteuert.</p>
+      <h1>Polypad API – Vollversion Test</h1>
+      <p>Eigene HTML/CSS/JS-Anwendung mit vollständig freigeschalteter Polypad-Oberfläche und JSON-Import/-Export.</p>
     </div>
-    <div class="status" id="apiStatus">API lädt …</div>
+    <div class="top-actions">
+      <button id="fullscreenAppBtn" type="button">App-Vollbild</button>
+      <div class="status" id="apiStatus">API lädt …</div>
+    </div>
   </header>
 
   <main class="layout">
-    <section class="panel">
-      <h2>Aufgabe</h2>
-      <p class="task" id="taskText">Stelle die Gleichung dar.</p>
+    <aside class="panel">
+      <section class="card">
+        <h2>Schnellstart</h2>
+        <p class="small">Die Polypad-Seitenleiste, Werkzeugleiste und Einstellungen sind vollständig eingeblendet. Du kannst also direkt im Polypad alle eingebauten Materialien und Werkzeuge nutzen.</p>
+        <div class="button-grid two">
+          <button id="resetFullBtn" type="button">Vollständiges Polypad neu laden</button>
+          <button id="clearBtn" type="button" class="danger">Canvas leeren</button>
+          <button id="toggleSidebarBtn" type="button">Seitenleiste umschalten</button>
+          <button id="focusCanvasBtn" type="button">Canvas fokussieren</button>
+        </div>
+      </section>
 
-      <div class="button-row">
-        <button id="newTaskBtn">Neue Aufgabe</button>
-        <button id="buildExampleBtn">Beispiel automatisch legen</button>
-        <button id="checkBtn">Prüfen</button>
-      </div>
+      <section class="card">
+        <h2>Werkzeuge</h2>
+        <div class="button-grid three">
+          <button data-tool="move" type="button">Move</button>
+          <button data-tool="pan" type="button">Pan</button>
+          <button data-tool="pen" data-option="pen" type="button">Pen</button>
+          <button data-tool="pen" data-option="marker" type="button">Marker</button>
+          <button data-tool="pen" data-option="highlighter" type="button">Highlighter</button>
+          <button data-tool="eraser" type="button">Eraser</button>
+          <button data-tool="text" data-option="text" type="button">Text</button>
+          <button data-tool="text" data-option="equation" type="button">Equation</button>
+          <button data-tool="geo" data-option="line" type="button">Line</button>
+          <button data-tool="geo" data-option="circle" type="button">Circle</button>
+          <button data-tool="geo" data-option="rect" type="button">Rect</button>
+          <button data-tool="geo" data-option="angle" type="button">Angle</button>
+          <button data-tool="geo" data-option="ruler" type="button">Ruler</button>
+        </div>
+      </section>
 
-      <div id="feedback" class="feedback neutral">Noch nicht geprüft.</div>
+      <section class="card">
+        <h2>Beispiel-Kacheln per API</h2>
+        <div class="button-grid two">
+          <button id="addTextBtn" type="button">Textfeld</button>
+          <button id="addEquationBtn" type="button">Gleichung</button>
+          <button id="addNumberCardBtn" type="button">Zahlenkarte</button>
+          <button id="addAlgebraBtn" type="button">x-Kachel</button>
+          <button id="addBalanceBtn" type="button">Waage</button>
+          <button id="pasteDemoBtn" type="button">Demo-Gruppe einfügen</button>
+        </div>
+      </section>
 
-      <h2>API-Steuerung: Kacheln</h2>
-      <div class="button-row">
-        <button id="addXBtn">x-Kachel</button>
-        <button id="addOneBtn">1er-Karte</button>
-        <button id="addFiveBtn">5er-Karte</button>
-        <button id="clearBtn" class="danger">Leeren</button>
-      </div>
+      <section class="card">
+        <h2>Auswahl bearbeiten</h2>
+        <div class="button-grid three">
+          <button id="selectAllBtn" type="button">Alles auswählen</button>
+          <button id="clearSelectionBtn" type="button">Auswahl aufheben</button>
+          <button id="deleteSelectionBtn" type="button" class="danger">Auswahl löschen</button>
+          <button id="lockSelectionBtn" type="button">Lock</button>
+          <button id="fixSelectionBtn" type="button">Fix</button>
+          <button id="unlockSelectionBtn" type="button">Unlock</button>
+          <button id="frontSelectionBtn" type="button">Nach vorne</button>
+          <button id="backSelectionBtn" type="button">Nach hinten</button>
+          <button id="rotateSelectionBtn" type="button">+15° drehen</button>
+        </div>
+        <label class="inline-label">Farbe
+          <input id="colorPicker" type="color" value="#ff8a00" />
+        </label>
+        <button id="applyColorBtn" type="button" class="wide">Farbe auf Auswahl anwenden</button>
+      </section>
 
-      <h2>Werkzeug wählen</h2>
-      <div class="button-row">
-        <button id="toolMoveBtn">Verschieben</button>
-        <button id="toolPenBtn">Stift</button>
-        <button id="toolTextBtn">Text</button>
-        <button id="toolEraserBtn">Radierer</button>
-      </div>
+      <section class="card">
+        <h2>Ansicht & Verlauf</h2>
+        <div class="button-grid two">
+          <button id="undoBtn" type="button">Rückgängig</button>
+          <button id="redoBtn" type="button">Wiederholen</button>
+          <button id="resetViewBtn" type="button">Ansicht zentrieren</button>
+          <button id="readViewportBtn" type="button">Viewport anzeigen</button>
+          <button id="zoomInBtn" type="button">Zoom +</button>
+          <button id="zoomOutBtn" type="button">Zoom −</button>
+        </div>
+      </section>
 
-      <h2>Ansicht &amp; Verlauf</h2>
-      <div class="button-row">
-        <button id="undoBtn">Rückgängig</button>
-        <button id="redoBtn">Wiederholen</button>
-        <button id="resetViewBtn">Ansicht zentrieren</button>
-        <button id="toggleSidebarBtn">Seitenleiste ein/aus</button>
-      </div>
+      <section class="card">
+        <h2>Canvas-Optionen</h2>
+        <div class="form-grid">
+          <label>Raster
+            <select id="gridSelect">
+              <option value="none">none</option>
+              <option value="square-dots" selected>square-dots</option>
+              <option value="square-grid">square-grid</option>
+              <option value="square2-grid">square2-grid</option>
+              <option value="tri-dots">tri-dots</option>
+              <option value="tri-grid">tri-grid</option>
+              <option value="tri2-dots">tri2-dots</option>
+              <option value="tri2-grid">tri2-grid</option>
+            </select>
+          </label>
+          <label>Canvas
+            <select id="canvasSelect">
+              <option value="infinite" selected>infinite</option>
+              <option value="fixed">fixed</option>
+              <option value="notebook">notebook</option>
+            </select>
+          </label>
+        </div>
+        <div class="button-grid two">
+          <button id="applyOptionsBtn" type="button">Optionen anwenden</button>
+          <button id="highContrastBtn" type="button">High Contrast an/aus</button>
+        </div>
+      </section>
 
-      <h2>Auswahl</h2>
-      <div class="button-row">
-        <button id="selectAllBtn">Alles auswählen</button>
-        <button id="clearSelectionBtn">Auswahl aufheben</button>
-        <button id="deleteSelectionBtn" class="danger">Auswahl löschen</button>
-      </div>
+      <section class="card">
+        <h2>Exporte / Drop-Zones</h2>
+        <div class="button-grid two">
+          <button id="getExportsBtn" type="button">Exports auslesen</button>
+          <button id="customButtonBtn" type="button">Custom-Button hinzufügen</button>
+          <button id="gestureBtn" type="button">Hand-Geste zeigen</button>
+          <button id="resizeBtn" type="button">Resize triggern</button>
+        </div>
+      </section>
 
-      <h2>Speichern / Laden / Exportieren</h2>
-      <div class="button-row">
-        <button id="exportBtn">JSON exportieren</button>
-        <button id="copyJsonBtn">JSON in Textfeld kopieren</button>
-        <button id="importBtn">JSON laden</button>
-      </div>
-      <div class="button-row">
-        <button id="previewJsonBtn">JSON-Vorschau erzeugen</button>
-        <button id="exportImageBtn">Bild exportieren (PNG)</button>
-      </div>
-      <textarea id="jsonBox" spellcheck="false" placeholder="Hier erscheint der Polypad-Zustand als JSON oder kann eingefügt werden."></textarea>
-      <img id="previewImg" class="preview-img" alt="Vorschau des JSON-Zustands" style="display:none;" />
-
-      <details>
-        <summary>Hinweis zur Testversion</summary>
-        <p>
-          Die automatische Prüfung ist absichtlich einfach gehalten: Sie zählt x-Kacheln und Zahlenkarten links/rechts der Waage.
-          Für eine echte Lernapp müsste man Aufgaben, Prüfregeln und erlaubte Werkzeuge genauer festlegen.
-        </p>
-      </details>
-    </section>
+      <section class="card json-card">
+        <h2>JSON anzeigen / eingeben</h2>
+        <div class="button-grid two">
+          <button id="showJsonBtn" type="button">Aktuellen Stand anzeigen</button>
+          <button id="copyClipboardBtn" type="button">JSON kopieren</button>
+          <button id="loadJsonBtn" type="button">JSON aus Textfeld laden</button>
+          <button id="downloadJsonBtn" type="button">JSON herunterladen</button>
+          <button id="previewJsonBtn" type="button">Vorschau aus JSON</button>
+          <button id="downloadImageBtn" type="button">PNG herunterladen</button>
+        </div>
+        <textarea id="jsonBox" spellcheck="false" placeholder="Hier kann ein Polypad-JSON eingefügt oder der aktuelle Stand angezeigt werden."></textarea>
+        <img id="previewImg" class="preview-img" alt="Vorschau des JSON-Zustands" hidden />
+      </section>
+    </aside>
 
     <section class="workspace">
       <div id="polypad"></div>
+      <footer class="infobar">
+        <span id="changeCounter">Änderungen: 0</span>
+        <span id="selectionInfo">Auswahl: –</span>
+        <span id="viewportInfo">Viewport: –</span>
+        <span id="exportsInfo">Exports: –</span>
+        <span id="lastActionInfo">Letzte Aktion: –</span>
+      </footer>
     </section>
   </main>
 
-  <footer>
-    <span id="changeCounter">Änderungen: 0</span>
-    <span id="selectionInfo">Auswahl: –</span>
-    <span id="zoomInfo">Zoom: 100%</span>
-    <span id="lastActionInfo">Letzte Aktion: –</span>
-  </footer>
-
-  <!-- Wichtig: Laut Dokumentation soll das Polypad-Skript im body eingebunden werden. -->
   <script src="https://static.mathigon.org/api/polypad-en-v5.0.5.js"></script>
   <script src="app.js"></script>
 </body>

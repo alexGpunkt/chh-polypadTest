@@ -1,15 +1,15 @@
-# Polypad API Test – Gleichungen mit Waage
+# Polypad API – Vollversion Test
 
-Testversion einer eigenen HTML/CSS/JS-Anwendung mit möglichst vollständiger Polypad-API-Einbindung
-(siehe offizielle Doku: https://mathigon.io/polypad/ und https://mathigon.io/polypad/tiles.html).
+Diese Testversion erweitert die funktionsfähige Minimalversion so, dass die **komplette Polypad-Oberfläche** in der eigenen HTML/CSS/JS-Anwendung nutzbar ist.
 
 ## Start
 
 1. ZIP entpacken.
 2. `index.html` im Browser öffnen.
-3. Internetverbindung ist notwendig, weil die Polypad-API von `https://static.mathigon.org/api/polypad-en-v5.0.5.js` geladen wird.
+3. Internetverbindung ist notwendig, weil die Polypad-API von Mathigon geladen wird:
+   `https://static.mathigon.org/api/polypad-en-v5.0.5.js`
 
-Falls der Browser lokale Dateien blockiert, starte im Ordner einen kleinen lokalen Server:
+Falls lokale Dateien im Browser Probleme machen, im entpackten Ordner starten:
 
 ```bash
 python -m http.server 8000
@@ -21,54 +21,78 @@ Dann öffnen:
 http://localhost:8000
 ```
 
-## Enthaltene Funktionen (App → Polypad)
+## Was wurde erweitert?
 
-- Polypad-Canvas per `Polypad.create(container, options)` erzeugen, inkl. Startzustand über `initial`
-- Startzustand zusätzlich per `unSerialize()` absichern (siehe Hinweis unten)
-- Einzelne Kacheln hinzufügen (`add`), z. B. x-Kacheln, Zahlenkarten
-- Beispielaufgabe automatisch ins Polypad legen
-- Werkzeug wechseln (`setTool`: Verschieben, Stift, Text, Radierer)
-- Verlauf steuern (`undo`, `redo`)
-- Ansicht zentrieren (`resetViewport`) und Seitenleiste ein-/ausblenden (`toggleSidebar`)
-- Auswahl steuern (`select`, `getSelection`, `delete` für die aktuelle Auswahl)
-- Polypad-Zustand als JSON exportieren/importieren (`serialize` / `unSerialize`)
-- Statisches Vorschaubild aus JSON-Text erzeugen, ohne es zu laden (`Polypad.toImage`, statische Methode)
-- Schnappschuss des aktuellen Canvas als PNG exportieren (`pad.image()`)
-- einfache automatische Prüfung der Gleichungs-Aufgabe
+### Vollständiges Polypad
 
-## Enthaltene Funktionen (Polypad → App)
+- Sidebar für Polypad-Kacheln eingeschaltet
+- Settings-Sidebar eingeschaltet
+- Toolbar eingeschaltet
+- Settings-Bar eingeschaltet
+- Keine Begrenzung auf einzelne Sidebar-Kategorien wie `numbers` oder `balance`
+- Keine Begrenzung auf einzelne Toolbar-Elemente
 
-- `change`-Event inkl. Auswertung des Delta-Objekts (hinzugefügt/geändert/gelöscht, statt es nur zu zählen)
-- `selection`-Event für die aktuelle Auswahl
-- `viewport`-Event für die Zoomstufe
-- `undo` / `redo`-Events
-- `options`-Event, wenn Lernende selbst UI-Einstellungen ändern
+In `fullInitialData()` werden `toolbar`, `settings` und `sidebar` absichtlich **nicht** begrenzt. Laut Polypad-Dokumentation werden alle Elemente angezeigt, wenn diese Optionen leer sind.
 
-## Wichtiger Hinweis zur `Polypad.create()`-Signatur
+### API-Testfunktionen
 
-Die Mathigon-Dokumentation zeigt im Quickstart-Beispiel `Polypad.create(containerElement)`,
-im ausführlichen TypeScript-Interface aber nur ein Optionen-Objekt als Parameter. Beides
-zusammen ergibt am plausibelsten die Signatur `Polypad.create(container, options)` – Element
-zuerst, Optionen-Objekt optional als zweites Argument. Da deine ursprüngliche Version mit
-`Polypad.create(container)` bereits funktionierte, wurde diese Variante hier beibehalten und um
-das Optionen-Objekt ergänzt.
+Über die eigene Oberfläche links sind viele API-Funktionen direkt testbar:
 
-Damit der Startzustand garantiert geladen wird, auch falls die `initial`-Option vom konkreten
-Build nicht unterstützt werden sollte, ruft `app.js` direkt nach `Polypad.create()` zusätzlich
-`pad.unSerialize(initialData())` auf. Das ist redundant, aber ungefährlich, und macht die App
-robuster gegenüber dieser einen offenen Frage in der Doku. Falls du das in der Praxis testest
-und merkst, dass nur eines der beiden gebraucht wird, kann der jeweils andere Aufruf entfernt
-werden.
+- `Polypad.create(...)`
+- `pad.serialize(...)`
+- `pad.unSerialize(...)`
+- `pad.image(...)`
+- `Polypad.toImage(...)`
+- `pad.add(...)`
+- `pad.update(...)`
+- `pad.delete(...)`
+- `pad.paste(...)`
+- `pad.getSelection(...)`
+- `pad.select(...)`
+- `pad.undo()`
+- `pad.redo()`
+- `pad.setOptions(...)`
+- `pad.setTool(...)`
+- `pad.clear()`
+- `pad.getViewport()`
+- `pad.setViewport(...)`
+- `pad.resetViewport()`
+- `pad.resize()`
+- `pad.getExports()`
+- `pad.showGesture(...)`
+- `pad.bindKeyboardEvents()`
+- `pad.destroy()` beim Neuaufbau
+- `pad.toggleSidebar(...)`
+- `pad.addCustomButton(...)`
 
-## Grenzen der Testversion
+### Events
 
-- Die automatische Prüfung ist weiterhin bewusst einfach gehalten: Sie zählt nur, ob links der
-  Waage die passenden x-Kacheln und Zahlenkarten liegen und rechts die Ergebniszahl. Für eine
-  robustere Prüfung könnten z. B. Categorizer-Kacheln (`name: 'categorizer'`) mit eingebauter
-  `validation`/`autoCheck`-Logik genutzt werden, statt die Positionen selbst auszuwerten.
-- Das Kippverhalten der Waage richtet sich nach der internen Standard-Gewichtung von Polypad.
-  Über `options.tileWeights` ließe sich das pro Kachelart manuell feintunen, falls nötig – das
-  genaue String-Format ist in der öffentlichen Doku nicht spezifiziert.
-- `splitH`/`splitV` bei Algebra-Kacheln (zusammengefasste Blöcke mehrerer x) werden von der
-  Prüfung aktuell nicht gesondert behandelt; eine zusammengelegte "3x"-Kachel zählt wie eine
-  einzelne Kachel.
+Die App lauscht auf:
+
+- `change`
+- `selection`
+- `viewport`
+- `move`
+- `export`
+- `undo`
+- `redo`
+- `options`
+
+Die Statuszeile unten zeigt Änderungen, Auswahl, Viewport, Exporte und letzte Aktion.
+
+## JSON bleibt erhalten
+
+Die Anwendung kann weiterhin:
+
+- aktuellen Polypad-Stand als JSON im Textfeld anzeigen
+- JSON in die Zwischenablage kopieren
+- JSON herunterladen
+- JSON aus dem Textfeld laden
+- Vorschau aus JSON erzeugen, ohne es vorher ins Polypad zu laden
+- aktuellen Polypad-Stand als PNG herunterladen
+
+## Grenzen
+
+Die Polypad-API stellt die eingebauten Polypad-Funktionen bereit, aber nicht jede interne UI-Funktion ist als eigene, dokumentierte JavaScript-Methode verfügbar. Deshalb ist der wichtigste Schritt für „alle Funktionen“: Die originale Polypad-UI vollständig einzublenden. Die zusätzlichen Buttons links dienen als API-Testpanel.
+
+Für eine produktive Lernanwendung würde ich später wieder gezielt einschränken, welche Werkzeuge sichtbar sind, damit Schüler nicht versehentlich mit zu vielen Optionen arbeiten.

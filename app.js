@@ -1,387 +1,455 @@
 /*
-  Polypad API Testversion
-  Thema: Gleichungen mit einer Waage, z. B. 3x + 5 = 8
+  Polypad API – Vollversion Test
 
-  Diese Version nutzt einen deutlich größeren Teil der offiziellen Polypad-API
-  (https://mathigon.io/polypad/), und zwar in beide Richtungen:
-
-  HTML/App  -> Polypad : create()-Optionen, add/update/delete, select, setTool,
-                         undo/redo, setOptions, toggleSidebar, getViewport/
-                         setViewport/resetViewport, image(), Polypad.toImage()
-  Polypad   -> HTML/App: change, selection, viewport, undo, redo, options
-                         Events; getSelection(); serialize()
-
-  Hinweis zur Signatur von Polypad.create(): Die Mathigon-Doku zeigt im
-  Quickstart "Polypad.create(containerElement)", listet im TypeScript-Interface
-  aber nur ein Optionen-Objekt. In der Praxis ist die Signatur
-  Polypad.create(container, options) — also Element zuerst, Optionen optional
-  als zweites Argument. Da deine bisherige Version mit Polypad.create(container)
-  schon funktioniert hat, ist das hier die sicherste Annahme. Falls die
-  "initial"-Option vom Build doch ignoriert werden sollte, fängt der Code das
-  unten ab, indem er den Startzustand zusätzlich per unSerialize() nachlädt.
+  Ziel dieser Version:
+  1. Die komplette Polypad-Oberfläche freischalten: Sidebar, Toolbar, Settings.
+     In PolypadData.options bleiben toolbar/settings/sidebar leer bzw. undefiniert,
+     denn laut Dokumentation bedeutet ein leeres Optionsfeld: alles anzeigen.
+  2. Zusätzlich möglichst viele API-Methoden über eigene Buttons testbar machen.
+  3. JSON weiterhin direkt anzeigen, kopieren, herunterladen, eingeben und laden.
 */
 
 const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 const apiStatus = $('#apiStatus');
-const taskText = $('#taskText');
-const feedback = $('#feedback');
 const jsonBox = $('#jsonBox');
+const previewImg = $('#previewImg');
 const changeCounter = $('#changeCounter');
 const selectionInfo = $('#selectionInfo');
-const zoomInfo = $('#zoomInfo');
+const viewportInfo = $('#viewportInfo');
+const exportsInfo = $('#exportsInfo');
 const lastActionInfo = $('#lastActionInfo');
-const previewImg = $('#previewImg');
 
 let pad = null;
 let changes = 0;
-let currentTask = { a: 3, b: 5, c: 8 };
+let highContrast = false;
+let customButtonCount = 0;
 
 function setStatus(text, type = '') {
   apiStatus.textContent = text;
   apiStatus.className = `status ${type}`.trim();
 }
 
-function setFeedback(text, kind = 'neutral') {
-  feedback.textContent = text;
-  feedback.className = `feedback ${kind}`;
-}
-
 function setLastAction(text) {
-  if (lastActionInfo) lastActionInfo.textContent = `Letzte Aktion: ${text}`;
-}
-
-function taskToText(t) {
-  return `Stelle die Gleichung ${t.a}x + ${t.b} = ${t.c} mit der Waage dar.`;
-}
-
-function randomTask() {
-  const a = Math.floor(Math.random() * 4) + 1; // 1 bis 4
-  const b = Math.floor(Math.random() * 7) + 1; // 1 bis 7
-  const x = Math.floor(Math.random() * 4) + 1; // gedachte Lösung 1 bis 4
-  return { a, b, c: a * x + b };
-}
-
-function initialData() {
-  return {
-    title: 'Gleichungen mit der Waage',
-    version: 5,
-    options: {
-      canvas: 'fixed',
-      canvasX: 1200,
-      canvasY: 700,
-      grid: 'square-dots',
-      sidebar: 'numbers,number-cards,algebra,balance',
-      toolbar: 'move,pen,text,eraser,color',
-      settings: 'fullscreen,grid,download'
-      // Tipp: "tileWeights" (PolypadOptions) kann genutzt werden, um das
-      // Kippverhalten der Waage für bestimmte Kachelarten manuell zu steuern,
-      // falls die Standard-Gewichtung (nach Zahlenwert) nicht passt.
-    },
-    tiles: {
-      intro: {
-        name: 'text',
-        x: -500,
-        y: -270,
-        width: 460,
-        fontSize: 20,
-        html: '<b>Aufgabe:</b><br>Lege links die Terme mit x und Zahlenkarten.<br>Lege rechts die Ergebniszahl.'
-      },
-      balance1: { name: 'balance', x: 0, y: 60, size: 2.2, level: 0 }
-    },
-    strokes: {}
-  };
+  lastActionInfo.textContent = `Letzte Aktion: ${text}`;
 }
 
 function requirePad() {
   if (!pad) {
-    setFeedback('Polypad ist noch nicht bereit.', 'bad');
+    setLastAction('Polypad ist noch nicht bereit');
     return false;
   }
   return true;
 }
 
-function initPolypad() {
-  if (!window.Polypad) {
-    setStatus('API nicht geladen', 'bad');
-    setFeedback('Die Polypad-API konnte nicht geladen werden. Prüfe Internetverbindung oder Script-URL.', 'bad');
-    return;
+function fullInitialData() {
+  return {
+    title: 'Polypad API Vollversion Test',
+    version: 5,
+    options: {
+      // Absichtlich KEIN toolbar/settings/sidebar-String:
+      // Wenn diese Werte leer sind, zeigt Polypad laut Doku alle UI-Elemente.
+      grid: 'square-dots',
+      canvas: 'infinite',
+      background: '#ffffff',
+      mergeTiles: true,
+      altColors: false,
+      highContrast: false
+    },
+    tiles: {
+      start_text: {
+        name: 'text',
+        x: -340,
+        y: -220,
+        width: 680,
+        fontSize: 22,
+        html: '<b>Vollständiges Polypad</b><br>Die linke Polypad-Seitenleiste, Werkzeugleiste und Einstellungen sind freigeschaltet. Du kannst alle Polypad-Materialien direkt im Canvas verwenden. Rechts/links in dieser Test-App kannst du zusätzlich API-Funktionen auslösen und den Zustand als JSON speichern oder laden.'
+      }
+    },
+    strokes: {}
+  };
+}
+
+function createPad() {
+  const container = $('#polypad');
+  if (pad) {
+    try { pad.destroy(); } catch (err) { console.warn('destroy fehlgeschlagen', err); }
+    pad = null;
+    container.innerHTML = '';
   }
 
+  // Die öffentliche Doku beschreibt Polypad.create(options). In den funktionierenden
+  // Minimalversionen wird praktisch Polypad.create(container, options) genutzt.
+  pad = Polypad.create(container, {
+    initial: fullInitialData(),
+    sidebarTiles: true,
+    sidebarSettings: true,
+    toolbar: true,
+    settings: true,
+    exportToCL: true,
+    canvasMargin: 40,
+    themeColours: {
+      orange: '#ff8a00',
+      blue: '#0b7cff',
+      green: '#18a843',
+      purple: '#6f42c1'
+    },
+    imageUpload: async (file) => {
+      // Lokale Demo-Lösung: Bild wird als Data-URL eingebettet.
+      // Für echte Nutzung sollte hier ein Upload zu eigenem Speicher erfolgen.
+      return await fileToDataUrl(file);
+    }
+  });
+
+  // Sicherheitsnetz, falls initial im verwendeten Build nicht verarbeitet wird.
+  pad.unSerialize(fullInitialData());
+  bindPadEvents();
+  pad.bindKeyboardEvents();
+  setStatus('API aktiv', 'ok');
+  changes = 0;
+  updateFooter();
+  setLastAction('Polypad vollständig geladen');
+}
+
+function init() {
+  if (!window.Polypad) {
+    setStatus('API nicht geladen', 'bad');
+    setLastAction('Polypad-Skript konnte nicht geladen werden');
+    return;
+  }
+  createPad();
+}
+
+function bindPadEvents() {
+  pad.on('change', (delta) => {
+    changes += 1;
+    changeCounter.textContent = `Änderungen: ${changes}`;
+    if (delta && typeof delta === 'object') {
+      const ids = Object.keys(delta);
+      setLastAction(ids.length === 1 ? describeDelta(ids[0], delta[ids[0]]) : `${ids.length} Elemente geändert`);
+    }
+  });
+
+  pad.on('selection', (event) => {
+    const count = event?.tiles?.length ?? 0;
+    selectionInfo.textContent = count ? `Auswahl: ${count} Element(e)` : 'Auswahl: –';
+  });
+
+  pad.on('viewport', (event) => {
+    updateViewportInfo(event);
+  });
+
+  pad.on('move', (event) => {
+    const count = event?.tiles?.length ?? 0;
+    if (count) setLastAction(`${count} Element(e) werden bewegt`);
+  });
+
+  pad.on('export', (event) => {
+    exportsInfo.textContent = `Exports: ${Object.keys(event || {}).length}`;
+  });
+
+  pad.on('undo', () => setLastAction('Rückgängig'));
+  pad.on('redo', () => setLastAction('Wiederholt'));
+  pad.on('options', (event) => setLastAction(`Optionen geändert: ${Object.keys(event || {}).join(', ') || 'unbekannt'}`));
+}
+
+function describeDelta(id, value) {
+  const [before, after] = value || [];
+  if (before === undefined && after) return `Hinzugefügt: ${after.name || id}`;
+  if (after === undefined && before) return `Gelöscht: ${before.name || id}`;
+  return `Geändert: ${after?.name || before?.name || id}`;
+}
+
+function updateFooter() {
+  changeCounter.textContent = `Änderungen: ${changes}`;
+  const selection = pad?.getSelection?.() || [];
+  selectionInfo.textContent = selection.length ? `Auswahl: ${selection.length} Element(e)` : 'Auswahl: –';
+  if (pad?.getViewport) updateViewportInfo(pad.getViewport());
   try {
-    const container = $('#polypad');
-
-    // Element zuerst, Konfigurationsobjekt als zweiter Parameter.
-    // sidebarTiles/sidebarSettings/toolbar/settings schalten die jeweiligen
-    // UI-Bereiche grundsätzlich frei; welche Inhalte darin sichtbar sind,
-    // steuert weiterhin data.options (sidebar/toolbar/settings-Strings).
-    pad = Polypad.create(container, {
-      initial: initialData(),
-      sidebarTiles: true,
-      sidebarSettings: true,
-      toolbar: true,
-      settings: true,
-      canvasMargin: 40
-    });
-
-    // Absicherung: Falls "initial" vom Build nicht unterstützt wird, sorgt
-    // unSerialize() trotzdem für den korrekten Startzustand, bevor die Person
-    // etwas anklicken kann.
-    pad.unSerialize(initialData());
-    pad.bindKeyboardEvents();
-
-    // --- Polypad -> App: Events -------------------------------------------
-
-    pad.on('change', (delta) => {
-      changes += 1;
-      changeCounter.textContent = `Änderungen: ${changes}`;
-
-      // delta: Record<id, [vorher, nachher]> – wir werten das für eine kurze
-      // Statusmeldung aus, statt es zu ignorieren.
-      if (delta && typeof delta === 'object') {
-        const ids = Object.keys(delta);
-        if (ids.length === 1) {
-          const [before, after] = delta[ids[0]];
-          if (before === undefined) setLastAction(`Kachel hinzugefügt (${after?.name ?? '?'})`);
-          else if (after === undefined) setLastAction(`Kachel gelöscht (${before?.name ?? '?'})`);
-          else setLastAction(`Kachel geändert (${after?.name ?? before?.name ?? '?'})`);
-        } else if (ids.length > 1) {
-          setLastAction(`${ids.length} Kacheln/Strokes geändert`);
-        }
-      }
-    });
-
-    pad.on('selection', (event) => {
-      const selected = event?.tiles?.length ? event.tiles.join(', ') : '–';
-      selectionInfo.textContent = `Auswahl: ${selected}`;
-    });
-
-    pad.on('viewport', (event) => {
-      if (zoomInfo && event) {
-        const zoomPct = Math.round((event.zoom ?? 1) * 100);
-        zoomInfo.textContent = `Zoom: ${zoomPct}%`;
-      }
-    });
-
-    pad.on('undo', () => setLastAction('Rückgängig'));
-    pad.on('redo', () => setLastAction('Wiederholt'));
-
-    // Wird ausgelöst, wenn Lernende selbst UI-Optionen im Einstellungen-Tab
-    // ändern (z. B. Raster ein/aus).
-    pad.on('options', () => setLastAction('Ansichtsoptionen geändert'));
-
-    setStatus('API aktiv', 'ok');
-    currentTask = randomTask();
-    taskText.textContent = taskToText(currentTask);
-    setFeedback('Lege die Aufgabe im Polypad oder klicke auf „Beispiel automatisch legen“.', 'neutral');
-  } catch (err) {
-    console.error(err);
-    setStatus('Fehler beim Start', 'bad');
-    setFeedback(`Fehler beim Start der Polypad-API: ${err.message}`, 'bad');
+    const exports = pad?.getExports?.() || {};
+    exportsInfo.textContent = `Exports: ${Object.keys(exports).length}`;
+  } catch {
+    exportsInfo.textContent = 'Exports: –';
   }
 }
 
-// --- App -> Polypad: einzelne Kacheln -----------------------------------
+function updateViewportInfo(v) {
+  if (!v) return;
+  viewportInfo.textContent = `Viewport: x ${Math.round(v.x)}, y ${Math.round(v.y)}, ${Math.round((v.zoom || 1) * 100)}%`;
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function randomPos() {
+  return {
+    x: Math.round(-180 + Math.random() * 360),
+    y: Math.round(-120 + Math.random() * 240)
+  };
+}
 
 function addTile(data) {
   if (!requirePad()) return;
-  return pad.add(data);
+  const id = pad.add(data);
+  pad.select(id);
+  return id;
 }
 
-function addXTile(x = -280, y = -60) {
-  return addTile({ name: 'algebra', expr: 'x', x, y, splitH: 1, splitV: 1 });
+function selectionIds() {
+  if (!requirePad()) return [];
+  return pad.getSelection();
 }
 
-function addNumberCard(value, x = -120, y = -60) {
-  return addTile({ name: 'number-card', value, valueStr: String(value), x, y });
-}
-
-function buildExample() {
-  if (!requirePad()) return;
-  pad.clear();
-  pad.add({ name: 'balance', x: 0, y: 70, size: 2.2, level: 0 });
-  pad.add({
-    name: 'text',
-    x: -500,
-    y: -275,
-    width: 520,
-    fontSize: 20,
-    html: `<b>${currentTask.a}x + ${currentTask.b} = ${currentTask.c}</b><br>Dies ist ein automatisch gelegtes Beispiel.`
-  });
-
-  for (let i = 0; i < currentTask.a; i++) {
-    addXTile(-360 + i * 75, -40);
-  }
-  addNumberCard(currentTask.b, -80, -40);
-  addNumberCard(currentTask.c, 285, -40);
-  pad.resetViewport();
-  setFeedback('Beispiel wurde in Polypad gelegt. Du kannst die Kacheln verschieben oder ändern.', 'neutral');
-}
-
-function getTiles() {
-  if (!requirePad()) return {};
-  return pad.serialize().tiles || {};
-}
-
-function checkWork() {
-  if (!requirePad()) return;
-  const tiles = Object.values(getTiles());
-
-  // Einfache Testlogik: links ist x < 0, rechts ist x >= 0.
-  // Versteckte/gesperrte Kacheln (z. B. Hinweistexte mit status: 'hidden')
-  // werden nicht mitgezählt.
-  const left = { xTiles: 0, numberSum: 0 };
-  const right = { xTiles: 0, numberSum: 0 };
-
-  for (const tile of tiles) {
-    if (tile.status === 'hidden') continue;
-    const side = (tile.x ?? 0) < 0 ? left : right;
-    if (tile.name === 'algebra' && String(tile.expr).trim() === 'x') side.xTiles += 1;
-    if (tile.name === 'number-card') side.numberSum += Number(tile.value ?? tile.valueStr ?? 0);
-  }
-
-  const ok = left.xTiles === currentTask.a &&
-             left.numberSum === currentTask.b &&
-             right.xTiles === 0 &&
-             right.numberSum === currentTask.c;
-
-  if (ok) {
-    setFeedback(`Richtig: Links liegen ${left.xTiles}x + ${left.numberSum}, rechts liegt ${right.numberSum}.`, 'good');
-  } else {
-    setFeedback(`Noch nicht passend. Erkannt: links ${left.xTiles}x + ${left.numberSum}, rechts ${right.xTiles}x + ${right.numberSum}.`, 'bad');
-  }
-}
-
-// --- App -> Polypad: Werkzeuge, Auswahl, Ansicht ------------------------
-
-function selectAll() {
-  if (!requirePad()) return;
-  const ids = Object.keys(getTiles());
-  pad.select(...ids);
-  setFeedback(`${ids.length} Kachel(n) ausgewählt.`, 'neutral');
-}
-
-function deleteSelection() {
-  if (!requirePad()) return;
-  const ids = pad.getSelection();
+function updateSelected(propertiesOrFn) {
+  const ids = selectionIds();
   if (!ids.length) {
-    setFeedback('Keine Kacheln ausgewählt.', 'neutral');
+    setLastAction('Keine Auswahl vorhanden');
     return;
   }
-  pad.delete(...ids);
-  setFeedback(`${ids.length} Kachel(n) gelöscht.`, 'neutral');
-}
-
-function clearSelection() {
-  if (!requirePad()) return;
-  pad.select();
-}
-
-// --- Speichern / Laden / Exportieren ------------------------------------
-
-function exportJson() {
-  if (!requirePad()) return;
   const data = pad.serialize();
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'polypad-zustand.json';
-  a.click();
-  URL.revokeObjectURL(url);
+  for (const id of ids) {
+    const tile = data.tiles?.[id];
+    if (!tile) continue;
+    const props = typeof propertiesOrFn === 'function' ? propertiesOrFn(tile) : propertiesOrFn;
+    pad.update(id, props);
+  }
+  setLastAction(`${ids.length} ausgewählte Element(e) aktualisiert`);
 }
 
-function copyJsonToTextArea() {
+function showJson() {
   if (!requirePad()) return;
-  jsonBox.value = JSON.stringify(pad.serialize(), null, 2);
+  jsonBox.value = JSON.stringify(pad.serialize(5000, 5000, 20000), null, 2);
+  setLastAction('JSON angezeigt');
 }
 
-function importJsonFromTextArea() {
+async function copyJsonToClipboard() {
+  showJson();
+  try {
+    await navigator.clipboard.writeText(jsonBox.value);
+    setLastAction('JSON in die Zwischenablage kopiert');
+  } catch {
+    jsonBox.select();
+    document.execCommand('copy');
+    setLastAction('JSON markiert/kopiert');
+  }
+}
+
+function loadJson() {
   if (!requirePad()) return;
   try {
     const data = JSON.parse(jsonBox.value);
     pad.unSerialize(data);
     pad.resetViewport();
-    setFeedback('JSON wurde geladen.', 'good');
+    changes = 0;
+    updateFooter();
+    setLastAction('JSON geladen');
   } catch (err) {
-    setFeedback(`JSON konnte nicht geladen werden: ${err.message}`, 'bad');
+    setLastAction(`JSON-Fehler: ${err.message}`);
+    alert(`JSON konnte nicht geladen werden:\n${err.message}`);
   }
 }
 
-// Statisches Bild aus dem JSON im Textfeld erzeugen, OHNE es ins Polypad zu
-// laden. Nutzt die statische Methode Polypad.toImage(data, type, w, h).
+function download(filename, textOrDataUrl, mime = 'text/plain') {
+  const a = document.createElement('a');
+  if (String(textOrDataUrl).startsWith('data:')) {
+    a.href = textOrDataUrl;
+  } else {
+    const blob = new Blob([textOrDataUrl], { type: mime });
+    a.href = URL.createObjectURL(blob);
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  }
+  a.download = filename;
+  a.click();
+}
+
+function downloadJson() {
+  if (!requirePad()) return;
+  const data = JSON.stringify(pad.serialize(5000, 5000, 20000), null, 2);
+  download('polypad-zustand.json', data, 'application/json');
+  setLastAction('JSON heruntergeladen');
+}
+
 function previewJson() {
   if (!window.Polypad) return;
   try {
     const data = JSON.parse(jsonBox.value);
-    const src = Polypad.toImage(data, 'png', 600, 350);
-    if (previewImg) {
-      previewImg.src = src;
-      previewImg.style.display = 'block';
-    }
-    setFeedback('Vorschau aus dem JSON-Text erzeugt (noch nicht geladen).', 'neutral');
+    previewImg.src = Polypad.toImage(data, 'png', 900, 520);
+    previewImg.hidden = false;
+    setLastAction('Vorschau aus JSON erzeugt');
   } catch (err) {
-    setFeedback(`Vorschau fehlgeschlagen: ${err.message}`, 'bad');
+    setLastAction(`Vorschau-Fehler: ${err.message}`);
+    alert(`Vorschau fehlgeschlagen:\n${err.message}`);
   }
 }
 
-// Schnappschuss des aktuell sichtbaren Polypad-Zustands als PNG, über die
-// asynchrone Instanzmethode .image(width, height, type).
-async function exportImage() {
+async function downloadImage() {
   if (!requirePad()) return;
   try {
-    const dataUrl = await pad.image(1200, 700, 'png');
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = 'polypad-bild.png';
-    a.click();
-    setFeedback('Bild wurde exportiert.', 'good');
+    const dataUrl = await pad.image(1400, 900, 'png');
+    download('polypad-bild.png', dataUrl);
+    setLastAction('PNG heruntergeladen');
   } catch (err) {
-    setFeedback(`Bildexport fehlgeschlagen: ${err.message}`, 'bad');
+    setLastAction(`PNG-Export fehlgeschlagen: ${err.message}`);
   }
 }
 
-// --- Event-Bindings -------------------------------------------------------
+// --- Event-Bindings ----------------------------------------------------
 
-$('#newTaskBtn').addEventListener('click', () => {
-  currentTask = randomTask();
-  taskText.textContent = taskToText(currentTask);
-  setFeedback('Neue Aufgabe erstellt. Lege sie mit Polypad-Kacheln nach.', 'neutral');
+window.addEventListener('load', init);
+
+$('#fullscreenAppBtn').addEventListener('click', () => {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+  else document.exitFullscreen?.();
 });
 
-$('#buildExampleBtn').addEventListener('click', buildExample);
-$('#checkBtn').addEventListener('click', checkWork);
-$('#addXBtn').addEventListener('click', () => addXTile(-260 + Math.random() * 80, -100 + Math.random() * 140));
-$('#addOneBtn').addEventListener('click', () => addNumberCard(1, -100 + Math.random() * 80, -100 + Math.random() * 140));
-$('#addFiveBtn').addEventListener('click', () => addNumberCard(5, 250 + Math.random() * 80, -100 + Math.random() * 140));
-$('#clearBtn').addEventListener('click', () => {
+$('#resetFullBtn').addEventListener('click', createPad);
+$('#clearBtn').addEventListener('click', () => requirePad() && pad.clear());
+$('#toggleSidebarBtn').addEventListener('click', () => requirePad() && pad.toggleSidebar());
+$('#focusCanvasBtn').addEventListener('click', () => $('#polypad').focus());
+
+$$('[data-tool]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (!requirePad()) return;
+    const tool = btn.dataset.tool;
+    const option = btn.dataset.option;
+    pad.setTool(tool, option);
+    setLastAction(option ? `Werkzeug: ${tool}/${option}` : `Werkzeug: ${tool}`);
+  });
+});
+
+$('#addTextBtn').addEventListener('click', () => addTile({
+  name: 'text',
+  ...randomPos(),
+  width: 360,
+  fontSize: 22,
+  html: '<b>Neues Textfeld</b><br>Doppelklick zum Bearbeiten.'
+}));
+
+$('#addEquationBtn').addEventListener('click', () => addTile({
+  name: 'equation',
+  ...randomPos(),
+  expr: '3x+5=8'
+}));
+
+$('#addNumberCardBtn').addEventListener('click', () => {
+  const value = Number(prompt('Wert der Zahlenkarte:', '5') || '5');
+  addTile({ name: 'number-card', ...randomPos(), value, valueStr: String(value) });
+});
+
+$('#addAlgebraBtn').addEventListener('click', () => addTile({
+  name: 'algebra',
+  ...randomPos(),
+  expr: 'x',
+  splitH: 1,
+  splitV: 1
+}));
+
+$('#addBalanceBtn').addEventListener('click', () => addTile({
+  name: 'balance',
+  ...randomPos(),
+  size: 2.1,
+  level: 0
+}));
+
+$('#pasteDemoBtn').addEventListener('click', () => {
   if (!requirePad()) return;
-  pad.clear();
-  setFeedback('Polypad wurde geleert.', 'neutral');
+  pad.paste({
+    demo_text: { name: 'text', x: -230, y: 120, width: 260, fontSize: 20, html: '<b>Paste-Demo</b><br>Diese Gruppe wurde per <code>pad.paste()</code> eingefügt.' },
+    demo_card: { name: 'number-card', x: 80, y: 130, value: 10, valueStr: '10' },
+    demo_x: { name: 'algebra', x: 170, y: 130, expr: 'x', color: '#0b7cff' }
+  });
+  setLastAction('Demo-Gruppe eingefügt');
 });
 
-// Werkzeuge
-$('#toolMoveBtn').addEventListener('click', () => requirePad() && pad.setTool('move'));
-$('#toolPenBtn').addEventListener('click', () => requirePad() && pad.setTool('pen'));
-$('#toolTextBtn').addEventListener('click', () => requirePad() && pad.setTool('text'));
-$('#toolEraserBtn').addEventListener('click', () => requirePad() && pad.setTool('eraser'));
+$('#selectAllBtn').addEventListener('click', () => {
+  if (!requirePad()) return;
+  const ids = Object.keys(pad.serialize().tiles || {});
+  pad.select(...ids);
+  updateFooter();
+});
+$('#clearSelectionBtn').addEventListener('click', () => requirePad() && pad.select());
+$('#deleteSelectionBtn').addEventListener('click', () => {
+  const ids = selectionIds();
+  if (ids.length) pad.delete(...ids);
+});
+$('#lockSelectionBtn').addEventListener('click', () => updateSelected({ status: 'locked' }));
+$('#fixSelectionBtn').addEventListener('click', () => updateSelected({ status: 'fixed' }));
+$('#unlockSelectionBtn').addEventListener('click', () => updateSelected({ status: undefined }));
+$('#frontSelectionBtn').addEventListener('click', () => updateSelected({ layer: 'front' }));
+$('#backSelectionBtn').addEventListener('click', () => updateSelected({ layer: 'back' }));
+$('#rotateSelectionBtn').addEventListener('click', () => updateSelected(tile => ({ rot: ((tile.rot || 0) + 15) % 360 })));
+$('#applyColorBtn').addEventListener('click', () => updateSelected({ color: $('#colorPicker').value }));
 
-// Ansicht & Verlauf
 $('#undoBtn').addEventListener('click', () => requirePad() && pad.undo());
 $('#redoBtn').addEventListener('click', () => requirePad() && pad.redo());
 $('#resetViewBtn').addEventListener('click', () => requirePad() && pad.resetViewport());
-$('#toggleSidebarBtn').addEventListener('click', () => requirePad() && pad.toggleSidebar());
+$('#readViewportBtn').addEventListener('click', () => {
+  if (!requirePad()) return;
+  const v = pad.getViewport();
+  updateViewportInfo(v);
+  setLastAction(`Viewport: ${JSON.stringify(v)}`);
+});
+$('#zoomInBtn').addEventListener('click', () => {
+  if (!requirePad()) return;
+  const v = pad.getViewport();
+  pad.setViewport(v.x, v.y, Math.min(4, v.zoom * 1.2));
+});
+$('#zoomOutBtn').addEventListener('click', () => {
+  if (!requirePad()) return;
+  const v = pad.getViewport();
+  pad.setViewport(v.x, v.y, Math.max(0.15, v.zoom / 1.2));
+});
 
-// Auswahl
-$('#selectAllBtn').addEventListener('click', selectAll);
-$('#deleteSelectionBtn').addEventListener('click', deleteSelection);
-$('#clearSelectionBtn').addEventListener('click', clearSelection);
+$('#applyOptionsBtn').addEventListener('click', () => {
+  if (!requirePad()) return;
+  pad.setOptions({
+    grid: $('#gridSelect').value,
+    canvas: $('#canvasSelect').value,
+    canvasX: 1200,
+    canvasY: 800
+  });
+  setLastAction('Canvas-Optionen angewendet');
+});
+$('#highContrastBtn').addEventListener('click', () => {
+  if (!requirePad()) return;
+  highContrast = !highContrast;
+  pad.setOptions({ highContrast });
+  setLastAction(`High Contrast: ${highContrast ? 'an' : 'aus'}`);
+});
 
-// Speichern / Laden / Export
-$('#exportBtn').addEventListener('click', exportJson);
-$('#copyJsonBtn').addEventListener('click', copyJsonToTextArea);
-$('#importBtn').addEventListener('click', importJsonFromTextArea);
+$('#getExportsBtn').addEventListener('click', () => {
+  if (!requirePad()) return;
+  const exports = pad.getExports();
+  exportsInfo.textContent = `Exports: ${Object.keys(exports || {}).length}`;
+  jsonBox.value = JSON.stringify(exports, null, 2);
+  setLastAction('Exports ins JSON-Feld geschrieben');
+});
+$('#customButtonBtn').addEventListener('click', () => {
+  if (!requirePad()) return;
+  customButtonCount += 1;
+  const btn = pad.addCustomButton('toolbar', `API ${customButtonCount}`);
+  btn.addEventListener('click', () => {
+    addTile({ name: 'text', ...randomPos(), width: 280, html: `Custom Button ${customButtonCount} wurde geklickt.` });
+  });
+  setLastAction('Custom-Button zur Polypad-Toolbar hinzugefügt');
+});
+$('#gestureBtn').addEventListener('click', () => {
+  if (!requirePad()) return;
+  pad.showGesture('#polypad', { x: 120, y: 0 });
+  setLastAction('Hand-Geste gezeigt');
+});
+$('#resizeBtn').addEventListener('click', () => requirePad() && pad.resize());
+
+$('#showJsonBtn').addEventListener('click', showJson);
+$('#copyClipboardBtn').addEventListener('click', copyJsonToClipboard);
+$('#loadJsonBtn').addEventListener('click', loadJson);
+$('#downloadJsonBtn').addEventListener('click', downloadJson);
 $('#previewJsonBtn').addEventListener('click', previewJson);
-$('#exportImageBtn').addEventListener('click', exportImage);
-
-window.addEventListener('load', initPolypad);
+$('#downloadImageBtn').addEventListener('click', downloadImage);
