@@ -28,7 +28,7 @@
 
       <div id="feedback" class="feedback neutral">Noch nicht geprüft.</div>
 
-      <h2>API-Steuerung</h2>
+      <h2>API-Steuerung: Kacheln</h2>
       <div class="button-row">
         <button id="addXBtn">x-Kachel</button>
         <button id="addOneBtn">1er-Karte</button>
@@ -36,13 +36,41 @@
         <button id="clearBtn" class="danger">Leeren</button>
       </div>
 
-      <h2>Speichern / Laden</h2>
+      <h2>Werkzeug wählen</h2>
+      <div class="button-row">
+        <button id="toolMoveBtn">Verschieben</button>
+        <button id="toolPenBtn">Stift</button>
+        <button id="toolTextBtn">Text</button>
+        <button id="toolEraserBtn">Radierer</button>
+      </div>
+
+      <h2>Ansicht &amp; Verlauf</h2>
+      <div class="button-row">
+        <button id="undoBtn">Rückgängig</button>
+        <button id="redoBtn">Wiederholen</button>
+        <button id="resetViewBtn">Ansicht zentrieren</button>
+        <button id="toggleSidebarBtn">Seitenleiste ein/aus</button>
+      </div>
+
+      <h2>Auswahl</h2>
+      <div class="button-row">
+        <button id="selectAllBtn">Alles auswählen</button>
+        <button id="clearSelectionBtn">Auswahl aufheben</button>
+        <button id="deleteSelectionBtn" class="danger">Auswahl löschen</button>
+      </div>
+
+      <h2>Speichern / Laden / Exportieren</h2>
       <div class="button-row">
         <button id="exportBtn">JSON exportieren</button>
         <button id="copyJsonBtn">JSON in Textfeld kopieren</button>
         <button id="importBtn">JSON laden</button>
       </div>
+      <div class="button-row">
+        <button id="previewJsonBtn">JSON-Vorschau erzeugen</button>
+        <button id="exportImageBtn">Bild exportieren (PNG)</button>
+      </div>
       <textarea id="jsonBox" spellcheck="false" placeholder="Hier erscheint der Polypad-Zustand als JSON oder kann eingefügt werden."></textarea>
+      <img id="previewImg" class="preview-img" alt="Vorschau des JSON-Zustands" style="display:none;" />
 
       <details>
         <summary>Hinweis zur Testversion</summary>
@@ -61,6 +89,8 @@
   <footer>
     <span id="changeCounter">Änderungen: 0</span>
     <span id="selectionInfo">Auswahl: –</span>
+    <span id="zoomInfo">Zoom: 100%</span>
+    <span id="lastActionInfo">Letzte Aktion: –</span>
   </footer>
 
   <!-- Wichtig: Laut Dokumentation soll das Polypad-Skript im body eingebunden werden. -->

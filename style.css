@@ -118,12 +118,22 @@ details {
 }
 footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 1rem;
+  gap: .5rem 1rem;
   padding: .7rem 1.25rem;
   border-top: 1px solid var(--border);
   color: var(--muted);
   background: white;
+  font-size: .85rem;
+}
+
+.preview-img {
+  width: 100%;
+  margin-top: .5rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
 }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
